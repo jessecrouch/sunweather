@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Weather Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow-x: hidden;
+        }
+        
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2a2a4a;
+        }
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        header h1 span {
+            color: #ff6b6b;
+        }
+        .header-time {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        /* Dashboard Grid */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 380px;
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+            padding: 12px;
+            height: calc(100vh - 60px);
+        }
+        
+        /* Panel Styles */
+        .panel {
+            background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%);
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header {
+            background: #1a1a2a;
+            padding: 10px 14px;
+            border-bottom: 1px solid #2a2a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .panel-subtitle {
+            font-size: 0.7rem;
+            color: #666;
+        }
+        .panel-content {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* SUVI Panel */
+        .suvi-panel {
+            grid-row: span 2;
+        }
+        .suvi-controls {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #0f0f18;
+            border-bottom: 1px solid #2a2a3a;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .suvi-controls select, .suvi-controls button {
+            background: #1a1a2a;
+            color: #ddd;
+            border: 1px solid #3a3a4a;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .suvi-controls button:hover {
+            background: #2a2a3a;
+        }
+        .suvi-controls button.active {
+            background: #3a5a8a;
+            border-color: #4a7aba;
+        }
+        .suvi-status {
+            margin-left: auto;
+            font-size: 0.7rem;
+            color: #666;
+        }
+        .suvi-image-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        .suvi-image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Kp Index Panel */
+        .kp-display {
+            display: flex;
+            height: 100%;
+        }
+        .kp-current {
+            width: 140px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a12;
+            border-right: 1px solid #2a2a3a;
+        }
+        .kp-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .kp-label {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        .kp-scale {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .kp-chart {
+            flex: 1;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        .kp-bars {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+            gap: 2px;
+            min-width: max-content;
+        }
+        .kp-bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 18px;
+        }
+        .kp-bar {
+            width: 14px;
+            border-radius: 2px 2px 0 0;
+            min-height: 2px;
+        }
+        .kp-bar-label {
+            font-size: 0.55rem;
+            color: #555;
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+        .kp-bar-group.predicted .kp-bar {
+            opacity: 0.6;
+            background-image: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.3) 2px,
+                rgba(0,0,0,0.3) 4px
+            );
+        }
+        
+        /* G-Scale Colors */
+        .g0 { background: #2a5a2a; color: #6f6; }
+        .g1 { background: #4a7a2a; color: #af4; }
+        .g2 { background: #7a7a2a; color: #ff4; }
+        .g3 { background: #8a5a2a; color: #fa2; }
+        .g4 { background: #8a3a2a; color: #f82; }
+        .g5 { background: #8a2a4a; color: #f4a; }
+        
+        /* Alerts Panel */
+        .alerts-panel {
+            grid-column: 3;
+            grid-row: span 2;
+        }
+        .alerts-list {
+            height: 100%;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .alert-item {
+            background: #15151f;
+            border: 1px solid #2a2a3a;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+        }
+        .alert-item:last-child {
+            margin-bottom: 0;
+        }
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .alert-type {
+            font-weight: 600;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .alert-type.warning { background: #5a4a2a; color: #fa2; }
+        .alert-type.watch { background: #4a3a5a; color: #a8f; }
+        .alert-type.alert { background: #5a2a2a; color: #f88; }
+        .alert-type.summary { background: #2a4a5a; color: #8cf; }
+        .alert-time {
+            color: #666;
+            font-size: 0.65rem;
+        }
+        .alert-message {
+            color: #aaa;
+            line-height: 1.4;
+        }
+        .alert-message strong {
+            color: #ddd;
+        }
+        
+        /* Enlil Panel */
+        .enlil-container {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        .enlil-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Aurora Panel */
+        .aurora-container {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        .aurora-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Loading States */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #555;
+            font-size: 0.8rem;
+        }
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #333;
+            border-top-color: #666;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a2a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3a3a4a;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4a4a5a;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .dashboard {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto auto;
+            }
+            .suvi-panel {
+                grid-row: span 1;
+                min-height: 400px;
+            }
+            .alerts-panel {
+                grid-column: span 2;
+                grid-row: auto;
+                max-height: 300px;
+            }
+        }
+        @media (max-width: 900px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .alerts-panel {
+                grid-column: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Space Weather <span>Dashboard</span></h1>
+        <div class="header-time" id="utcTime">Loading...</div>
+    </header>
+    
+    <div class="dashboard">
+        <!-- SUVI Solar Animation -->
+        <div class="panel suvi-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">GOES SUVI Solar Imagery</div>
+                    <div class="panel-subtitle">Extreme Ultraviolet Telescope</div>
+                </div>
+            </div>
+            <div class="suvi-controls">
+                <select id="wavelength">
+                    <option value="094">94 &#8491;</option>
+                    <option value="131">131 &#8491;</option>
+                    <option value="171" selected>171 &#8491;</option>
+                    <option value="195">195 &#8491;</option>
+                    <option value="284">284 &#8491;</option>
+                    <option value="304">304 &#8491;</option>
+                </select>
+                <button id="playBtn" class="active">Pause</button>
+                <button id="speedBtn">1x</button>
+                <input type="range" id="frameSlider" min="0" max="100" value="0" style="width: 100px;">
+                <span class="suvi-status" id="suviStatus">Loading...</span>
+            </div>
+            <div class="panel-content suvi-image-container">
+                <div class="loading" id="suviLoading">
+                    <div class="loading-spinner"></div>
+                    <span>Loading solar imagery...</span>
+                </div>
+                <img id="suviImage" style="display: none;" alt="SUVI Solar Image">
+            </div>
+        </div>
+        
+        <!-- WSA-Enlil CME Forecast -->
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">WSA-Enlil Solar Wind</div>
+                    <div class="panel-subtitle">CME Impact Prediction Model</div>
+                </div>
+                <button id="enlilPlayBtn" class="active" style="background:#1a1a2a;color:#ddd;border:1px solid #3a3a4a;padding:4px 8px;border-radius:4px;font-size:0.7rem;cursor:pointer;">Pause</button>
+            </div>
+            <div class="panel-content enlil-container">
+                <div class="loading" id="enlilLoading">
+                    <div class="loading-spinner"></div>
+                    <span>Loading CME forecast...</span>
+                </div>
+                <img id="enlilImage" style="display: none;" alt="Enlil Solar Wind">
+            </div>
+        </div>
+        
+        <!-- Kp Index -->
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Planetary Kp Index</div>
+                    <div class="panel-subtitle">Geomagnetic Activity / Aurora Forecast</div>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="kp-display">
+                    <div class="kp-current">
+                        <div class="kp-value" id="kpValue">--</div>
+                        <div class="kp-label">Current Kp</div>
+                        <div class="kp-scale g0" id="kpScale">--</div>
+                    </div>
+                    <div class="kp-chart">
+                        <div class="kp-bars" id="kpBars">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Aurora Forecast -->
+        <div class="panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Aurora Forecast (OVATION)</div>
+                    <div class="panel-subtitle">Northern Hemisphere 30-min Forecast</div>
+                </div>
+                <button id="auroraPlayBtn" class="active" style="background:#1a1a2a;color:#ddd;border:1px solid #3a3a4a;padding:4px 8px;border-radius:4px;font-size:0.7rem;cursor:pointer;">Pause</button>
+            </div>
+            <div class="panel-content aurora-container">
+                <div class="loading" id="auroraLoading">
+                    <div class="loading-spinner"></div>
+                    <span>Loading aurora forecast...</span>
+                </div>
+                <img id="auroraImage" style="display: none;" alt="Aurora Forecast">
+            </div>
+        </div>
+        
+        <!-- Alerts -->
+        <div class="panel alerts-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Space Weather Alerts</div>
+                    <div class="panel-subtitle">NOAA SWPC Notifications</div>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="alerts-list" id="alertsList">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <span>Loading alerts...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://services.swpc.noaa.gov';
+        
+        // ===== UTC Clock =====
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('utcTime').textContent = 
+                now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+        
+        // ===== SUVI Animation =====
+        const suviState = {
+            frames: [],
+            frameIndex: 0,
+            isPlaying: true,
+            animationId: null,
+            lastFrameTime: 0,
+            speeds: [100, 50, 200],
+            speedIndex: 0,
+            speedLabels: ['1x', '2x', '0.5x']
+        };
+        
+        async function loadSuviFrames(wavelength) {
+            suviState.frames = [];
+            suviState.frameIndex = 0;
+            document.getElementById('suviImage').style.display = 'none';
+            document.getElementById('suviLoading').style.display = 'flex';
+            document.getElementById('suviStatus').textContent = 'Fetching frames...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/products/animations/suvi-primary-${wavelength}.json`);
+                const data = await response.json();
+                const urls = data.map(item => BASE_URL + item.url);
+                
+                // Load frames in batches
+                const batchSize = 20;
+                let loaded = 0;
+                const loadedFrames = new Array(urls.length);
+                
+                for (let i = 0; i < urls.length; i += batchSize) {
+                    const batch = urls.slice(i, i + batchSize);
+                    await Promise.all(batch.map((url, idx) => {
+                        return new Promise(resolve => {
+                            const img = new Image();
+                            img.onload = () => {
+                                loadedFrames[i + idx] = img;
+                                loaded++;
+                                document.getElementById('suviStatus').textContent = `Loading ${loaded}/${urls.length}`;
+                                resolve();
+                            };
+                            img.onerror = () => { loaded++; resolve(); };
+                            img.src = url;
+                        });
+                    }));
+                }
+                
+                suviState.frames = loadedFrames.filter(f => f);
+                document.getElementById('frameSlider').max = suviState.frames.length - 1;
+                document.getElementById('frameSlider').value = 0;
+                
+                document.getElementById('suviLoading').style.display = 'none';
+                document.getElementById('suviImage').style.display = 'block';
+                document.getElementById('suviImage').src = suviState.frames[0].src;
+                document.getElementById('suviStatus').textContent = `${suviState.frames.length} frames | ${wavelength}Å`;
+                
+                if (suviState.isPlaying) startSuviAnimation();
+            } catch (err) {
+                document.getElementById('suviStatus').textContent = 'Error loading';
+                console.error(err);
+            }
+        }
+        
+        function animateSuvi(timestamp) {
+            if (!suviState.isPlaying || suviState.frames.length === 0) return;
+            
+            const elapsed = timestamp - suviState.lastFrameTime;
+            if (elapsed >= suviState.speeds[suviState.speedIndex]) {
+                suviState.frameIndex = (suviState.frameIndex + 1) % suviState.frames.length;
+                document.getElementById('suviImage').src = suviState.frames[suviState.frameIndex].src;
+                document.getElementById('frameSlider').value = suviState.frameIndex;
+                suviState.lastFrameTime = timestamp;
+            }
+            suviState.animationId = requestAnimationFrame(animateSuvi);
+        }
+        
+        function startSuviAnimation() {
+            if (suviState.animationId) cancelAnimationFrame(suviState.animationId);
+            suviState.lastFrameTime = 0;
+            suviState.animationId = requestAnimationFrame(animateSuvi);
+        }
+        
+        document.getElementById('playBtn').addEventListener('click', function() {
+            suviState.isPlaying = !suviState.isPlaying;
+            this.textContent = suviState.isPlaying ? 'Pause' : 'Play';
+            this.classList.toggle('active', suviState.isPlaying);
+            if (suviState.isPlaying) startSuviAnimation();
+        });
+        
+        document.getElementById('speedBtn').addEventListener('click', function() {
+            suviState.speedIndex = (suviState.speedIndex + 1) % suviState.speeds.length;
+            this.textContent = suviState.speedLabels[suviState.speedIndex];
+        });
+        
+        document.getElementById('wavelength').addEventListener('change', function() {
+            if (suviState.animationId) cancelAnimationFrame(suviState.animationId);
+            loadSuviFrames(this.value);
+        });
+        
+        document.getElementById('frameSlider').addEventListener('input', function() {
+            suviState.frameIndex = parseInt(this.value);
+            if (suviState.frames[suviState.frameIndex]) {
+                document.getElementById('suviImage').src = suviState.frames[suviState.frameIndex].src;
+            }
+        });
+        
+        // ===== Kp Index =====
+        function getKpColor(kp) {
+            if (kp >= 9) return 'g5';
+            if (kp >= 8) return 'g5';
+            if (kp >= 7) return 'g4';
+            if (kp >= 6) return 'g3';
+            if (kp >= 5) return 'g2';
+            if (kp >= 4) return 'g1';
+            return 'g0';
+        }
+        
+        function getGScale(kp) {
+            if (kp >= 9) return 'G5 Extreme';
+            if (kp >= 8) return 'G4 Severe';
+            if (kp >= 7) return 'G3 Strong';
+            if (kp >= 6) return 'G2 Moderate';
+            if (kp >= 5) return 'G1 Minor';
+            if (kp >= 4) return 'Active';
+            return 'Quiet';
+        }
+        
+        async function loadKpIndex() {
+            try {
+                const response = await fetch(`${BASE_URL}/products/noaa-planetary-k-index-forecast.json`);
+                const data = await response.json();
+                
+                // Skip header row
+                const rows = data.slice(1);
+                
+                // Find current (most recent observed)
+                let currentKp = 0;
+                let currentIdx = 0;
+                for (let i = rows.length - 1; i >= 0; i--) {
+                    if (rows[i][2] === 'observed') {
+                        currentKp = parseFloat(rows[i][1]);
+                        currentIdx = i;
+                        break;
+                    }
+                }
+                
+                // Update current display
+                const kpValueEl = document.getElementById('kpValue');
+                const kpScaleEl = document.getElementById('kpScale');
+                kpValueEl.textContent = currentKp.toFixed(1);
+                kpValueEl.className = 'kp-value ' + getKpColor(currentKp);
+                kpScaleEl.textContent = getGScale(currentKp);
+                kpScaleEl.className = 'kp-scale ' + getKpColor(currentKp);
+                
+                // Build bar chart (last 24 observed + future predicted)
+                const startIdx = Math.max(0, currentIdx - 24);
+                const displayRows = rows.slice(startIdx);
+                
+                const barsContainer = document.getElementById('kpBars');
+                barsContainer.innerHTML = '';
+                
+                displayRows.forEach((row, i) => {
+                    const kp = parseFloat(row[1]);
+                    const time = new Date(row[0] + 'Z');
+                    const type = row[2]; // observed, estimated, predicted
+                    
+                    const group = document.createElement('div');
+                    group.className = 'kp-bar-group' + (type !== 'observed' ? ' predicted' : '');
+                    
+                    const bar = document.createElement('div');
+                    bar.className = 'kp-bar ' + getKpColor(kp);
+                    bar.style.height = `${(kp / 9) * 100}%`;
+                    bar.title = `Kp ${kp.toFixed(1)} - ${time.toISOString().substring(5, 16).replace('T', ' ')} UTC (${type})`;
+                    
+                    const label = document.createElement('div');
+                    label.className = 'kp-bar-label';
+                    // Show label every 4th bar
+                    if (i % 4 === 0) {
+                        label.textContent = time.toISOString().substring(5, 10);
+                    }
+                    
+                    group.appendChild(bar);
+                    group.appendChild(label);
+                    barsContainer.appendChild(group);
+                });
+                
+            } catch (err) {
+                console.error('Kp load error:', err);
+            }
+        }
+        
+        // ===== Alerts =====
+        function parseAlertType(productId) {
+            if (productId.includes('W') || productId.startsWith('WAR')) return { type: 'warning', label: 'WARNING' };
+            if (productId.includes('F') || productId.startsWith('WAT')) return { type: 'watch', label: 'WATCH' };
+            if (productId.includes('A') || productId.startsWith('ALT')) return { type: 'alert', label: 'ALERT' };
+            return { type: 'summary', label: 'SUMMARY' };
+        }
+        
+        function extractAlertSummary(message) {
+            // Extract key info from message
+            const lines = message.split('\r\n').filter(l => l.trim());
+            let summary = '';
+            
+            for (const line of lines) {
+                if (line.includes('WARNING:') || line.includes('WATCH:') || 
+                    line.includes('ALERT:') || line.includes('SUMMARY:')) {
+                    summary = line.split(':').slice(1).join(':').trim();
+                    break;
+                }
+            }
+            
+            // Get potential impacts
+            const impactIdx = message.indexOf('Potential Impacts:');
+            if (impactIdx > -1) {
+                const impactText = message.substring(impactIdx + 18, impactIdx + 200);
+                const firstSentence = impactText.split('.')[0];
+                if (firstSentence) {
+                    summary += summary ? ' - ' + firstSentence : firstSentence;
+                }
+            }
+            
+            return summary || message.substring(0, 150);
+        }
+        
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`${BASE_URL}/products/alerts.json`);
+                const data = await response.json();
+                
+                const container = document.getElementById('alertsList');
+                container.innerHTML = '';
+                
+                // Show most recent 20 alerts
+                const recentAlerts = data.slice(0, 20);
+                
+                recentAlerts.forEach(alert => {
+                    const { type, label } = parseAlertType(alert.product_id);
+                    const time = new Date(alert.issue_datetime + 'Z');
+                    const timeStr = time.toISOString().substring(5, 16).replace('T', ' ');
+                    
+                    const item = document.createElement('div');
+                    item.className = 'alert-item';
+                    
+                    const summary = extractAlertSummary(alert.message);
+                    
+                    item.innerHTML = `
+                        <div class="alert-header">
+                            <span class="alert-type ${type}">${label}</span>
+                            <span class="alert-time">${timeStr} UTC</span>
+                        </div>
+                        <div class="alert-message">${summary}</div>
+                    `;
+                    
+                    container.appendChild(item);
+                });
+                
+            } catch (err) {
+                console.error('Alerts load error:', err);
+                document.getElementById('alertsList').innerHTML = '<div class="loading">Failed to load alerts</div>';
+            }
+        }
+        
+        // ===== Enlil Animation =====
+        const enlilState = {
+            frames: [],
+            frameIndex: 0,
+            isPlaying: true,
+            animationId: null
+        };
+        
+        async function loadEnlil() {
+            try {
+                const response = await fetch(`${BASE_URL}/products/animations/enlil.json`);
+                const data = await response.json();
+                const urls = data.map(item => BASE_URL + item.url);
+                
+                // Preload frames
+                const loadedFrames = [];
+                for (const url of urls) {
+                    const img = new Image();
+                    await new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        img.src = url;
+                    });
+                    if (img.complete && img.naturalWidth > 0) {
+                        loadedFrames.push(img);
+                    }
+                }
+                
+                enlilState.frames = loadedFrames;
+                document.getElementById('enlilLoading').style.display = 'none';
+                document.getElementById('enlilImage').style.display = 'block';
+                
+                if (enlilState.frames.length > 0) {
+                    document.getElementById('enlilImage').src = enlilState.frames[0].src;
+                    if (enlilState.isPlaying) animateEnlil();
+                }
+            } catch (err) {
+                console.error('Enlil load error:', err);
+            }
+        }
+        
+        function animateEnlil() {
+            if (!enlilState.isPlaying || enlilState.frames.length === 0) return;
+            
+            enlilState.frameIndex = (enlilState.frameIndex + 1) % enlilState.frames.length;
+            document.getElementById('enlilImage').src = enlilState.frames[enlilState.frameIndex].src;
+            
+            enlilState.animationId = setTimeout(animateEnlil, 150);
+        }
+        
+        document.getElementById('enlilPlayBtn').addEventListener('click', function() {
+            enlilState.isPlaying = !enlilState.isPlaying;
+            this.textContent = enlilState.isPlaying ? 'Pause' : 'Play';
+            this.classList.toggle('active', enlilState.isPlaying);
+            if (enlilState.isPlaying) animateEnlil();
+            else clearTimeout(enlilState.animationId);
+        });
+        
+        // ===== Aurora Animation =====
+        const auroraState = {
+            frames: [],
+            frameIndex: 0,
+            isPlaying: true,
+            animationId: null
+        };
+        
+        async function loadAurora() {
+            try {
+                const response = await fetch(`${BASE_URL}/products/animations/ovation_north_24h.json`);
+                const data = await response.json();
+                const urls = data.map(item => BASE_URL + item.url);
+                
+                // Preload frames
+                const loadedFrames = [];
+                for (const url of urls) {
+                    const img = new Image();
+                    await new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        img.src = url;
+                    });
+                    if (img.complete && img.naturalWidth > 0) {
+                        loadedFrames.push(img);
+                    }
+                }
+                
+                auroraState.frames = loadedFrames;
+                document.getElementById('auroraLoading').style.display = 'none';
+                document.getElementById('auroraImage').style.display = 'block';
+                
+                if (auroraState.frames.length > 0) {
+                    document.getElementById('auroraImage').src = auroraState.frames[0].src;
+                    if (auroraState.isPlaying) animateAurora();
+                }
+            } catch (err) {
+                console.error('Aurora load error:', err);
+            }
+        }
+        
+        function animateAurora() {
+            if (!auroraState.isPlaying || auroraState.frames.length === 0) return;
+            
+            auroraState.frameIndex = (auroraState.frameIndex + 1) % auroraState.frames.length;
+            document.getElementById('auroraImage').src = auroraState.frames[auroraState.frameIndex].src;
+            
+            auroraState.animationId = setTimeout(animateAurora, 200);
+        }
+        
+        document.getElementById('auroraPlayBtn').addEventListener('click', function() {
+            auroraState.isPlaying = !auroraState.isPlaying;
+            this.textContent = auroraState.isPlaying ? 'Pause' : 'Play';
+            this.classList.toggle('active', auroraState.isPlaying);
+            if (auroraState.isPlaying) animateAurora();
+            else clearTimeout(auroraState.animationId);
+        });
+        
+        // ===== Initialize =====
+        loadSuviFrames('171');
+        loadKpIndex();
+        loadAlerts();
+        loadEnlil();
+        loadAurora();
+        
+        // Refresh data periodically
+        setInterval(loadKpIndex, 5 * 60 * 1000);  // 5 min
+        setInterval(loadAlerts, 5 * 60 * 1000);   // 5 min
+        setInterval(() => loadSuviFrames(document.getElementById('wavelength').value), 10 * 60 * 1000);  // 10 min
+        setInterval(loadEnlil, 15 * 60 * 1000);   // 15 min
+        setInterval(loadAurora, 10 * 60 * 1000);  // 10 min
+    </script>
+</body>
+</html>
